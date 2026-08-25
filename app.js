@@ -9,46 +9,25 @@ const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'B
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-const demo={
+const initialState={
  bases:[
-  {id:'b1',nome:'Base 1',localidade:'Salvador',status:'Ativa'},
-  {id:'b2',nome:'Base 2',localidade:'Candeias',status:'Ativa'},
-  {id:'b3',nome:'Base 3',localidade:'Simões Filho',status:'Ativa'},
-  {id:'b4',nome:'Base 4',localidade:'Lauro de Freitas',status:'Ativa'}
+  {id:'b1',nome:'Base 1',localidade:'',status:'Ativa'},
+  {id:'b2',nome:'Base 2',localidade:'',status:'Ativa'},
+  {id:'b3',nome:'Base 3',localidade:'',status:'Ativa'},
+  {id:'b4',nome:'Base 4',localidade:'',status:'Ativa'}
  ],
- drivers:[
-  {id:'d1',nome:'Rafael Santos',telefone:'71999990011',nascimento:'1991-08-25',rota:'Salvador Centro',valorPacote:3.5,base:'Base 1',banco:'',agencia:'',conta:'',pix:'',status:'Ativo',obs:''},
-  {id:'d2',nome:'Diego Lima',telefone:'71999990012',nascimento:'1988-11-10',rota:'Candeias',valorPacote:3.2,base:'Base 2',banco:'',agencia:'',conta:'',pix:'',status:'Ativo',obs:''},
-  {id:'d3',nome:'Lucas Rocha',telefone:'71999990013',nascimento:'1994-03-18',rota:'Simões Filho',valorPacote:3.4,base:'Base 3',banco:'',agencia:'',conta:'',pix:'',status:'Ativo',obs:''},
-  {id:'d4',nome:'André Costa',telefone:'71999990014',nascimento:'1990-06-02',rota:'Lauro de Freitas',valorPacote:3.3,base:'Base 4',banco:'',agencia:'',conta:'',pix:'',status:'Ativo',obs:''}
- ],
- orders:[
-  {waybill:'WB260824001',referencia:'PED-90831',cliente:'Loja Alpha',destinatario:'Carlos Silva',telefone:'71999990001',endereco:'Rua A, 120',cidade:'Salvador',localidade:'Centro',base:'Base 1',prazo:'2026-08-25',status:'Em rota',volumes:1,entregador:'Rafael Santos',ultimo:'Saiu para entrega',atualizacao:'25/08/2026 08:42',ocorrencia:''},
-  {waybill:'WB260824002',referencia:'PED-90832',cliente:'Marketplace Beta',destinatario:'Ana Souza',telefone:'71999990002',endereco:'Av. Central, 45',cidade:'Candeias',localidade:'Centro',base:'Base 2',prazo:'2026-08-26',status:'Recebido no DS',volumes:2,entregador:'',ultimo:'Recebido no DS',atualizacao:'25/08/2026 07:10',ocorrencia:''},
-  {waybill:'WB260824003',referencia:'PED-90833',cliente:'Loja Alpha',destinatario:'João Santos',telefone:'71999990003',endereco:'Rua das Flores, 9',cidade:'Simões Filho',localidade:'CIA',base:'Base 3',prazo:'2026-08-25',status:'Entregue',volumes:1,entregador:'Lucas Rocha',ultimo:'Entregue',atualizacao:'25/08/2026 09:05',ocorrencia:''},
-  {waybill:'WB260824004',referencia:'PED-90834',cliente:'Seller Gamma',destinatario:'Marcos Lima',telefone:'71999990004',endereco:'Rua B, 77',cidade:'Salvador',localidade:'Itapuã',base:'Base 1',prazo:'2026-08-24',status:'Ocorrência',volumes:1,entregador:'Diego Lima',ultimo:'Tentativa sem sucesso',atualizacao:'25/08/2026 08:18',ocorrencia:'Destinatário ausente'},
-  {waybill:'WB260824005',referencia:'PED-90835',cliente:'Marketplace Beta',destinatario:'Paula Reis',telefone:'71999990005',endereco:'Praça Norte, 20',cidade:'Lauro de Freitas',localidade:'Centro',base:'Base 4',prazo:'2026-08-26',status:'Triagem',volumes:3,entregador:'',ultimo:'Em triagem',atualizacao:'25/08/2026 08:05',ocorrencia:''}
- ],
- expenses:[
-  {id:'e1',descricao:'Combustível apoio operacional',valor:280,data:'2026-08-24',pagamento:'PIX',categoria:'Combustível',base:'Base 1',responsavel:'Operação',obs:''}
- ],
- users:[
-  {id:'u1',nome:'Administrador',email:'admin@empresa.com',perfil:'Super Admin',base:'Todas',status:'Ativo'}
- ]
+ drivers:[],
+ orders:[],
+ expenses:[],
+ users:[]
 };
-const KEY='last-mile-ds-v5';
-function migrate(){
- let v5=JSON.parse(localStorage.getItem(KEY)||'null'); if(v5)return v5;
- let old=JSON.parse(localStorage.getItem('last-mile-ds-v4')||'null');
- let s=structuredClone(demo);
- if(old?.orders?.length){s.orders=old.orders.map((o,i)=>({...o,base:o.base||`Base ${(i%4)+1}`,localidade:o.localidade||o.cidade||''}));}
- return s;
-}
-let state=migrate();
+const KEY='middia-last-mile-v6';
+let state=JSON.parse(localStorage.getItem(KEY)||'null') || structuredClone(initialState);
 const save=()=>localStorage.setItem(KEY,JSON.stringify(state)); save();
 
 function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2200)}
 function badge(s){let c=s==='Entregue'?'green':s==='Ocorrência'||s==='Devolução'?'red':s==='Em rota'?'blue':s==='Triagem'||s==='Despachado'?'orange':'';return `<span class="badge ${c}">${esc(s)}</span>`}
+function paymentBadge(s){let c=s==='Pago'?'green':s==='Cancelado'?'red':s==='Aguardando aprovação'||s==='Agendado'?'orange':'';return `<span class="badge ${c}">${esc(s||'Não informado')}</span>`}
 function slaText(o){const d=new Date(o.prazo+'T23:59:59');if(o.status==='Entregue')return'Concluído';const t=new Date();return d<t?'Atrasado':d.toDateString()===t.toDateString()?'Vence hoje':'No prazo'}
 function sla(o){let s=slaText(o);return `<span class="sla ${s==='Atrasado'?'late':s==='Vence hoje'?'warn':'ok'}">${s}</span>`}
 function kpi(t,v,s,c=''){return `<div class="card kpi ${c}"><span>${t}</span><strong>${v}</strong><small>${s}</small></div>`}
@@ -83,7 +62,14 @@ function driversPage(){
  return `<div class="card"><div class="toolbar"><div><h3>Cadastro de motoristas</h3><p class="muted">Nascimento, rota, valor por pacote, banco, PIX e base atendida.</p></div><button class="primary-btn" id="addDriver">+ Novo motorista</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Telefone</th><th>Nascimento</th><th>Rota desejada</th><th>Valor/pacote</th><th>Base</th><th>Banco</th><th>PIX</th><th>Status</th><th>Ações</th></tr></thead><tbody>${state.drivers.map(d=>`<tr><td><strong>${esc(d.nome)}</strong></td><td>${esc(d.telefone)}</td><td>${d.nascimento?new Date(d.nascimento+'T12:00').toLocaleDateString('pt-BR'):'-'}</td><td>${esc(d.rota||'-')}</td><td>${money(d.valorPacote)}</td><td>${esc(d.base||'-')}</td><td>${esc(d.banco||'-')}</td><td>${esc(d.pix||'-')}</td><td>${badge(d.status)}</td><td><button class="row-btn" onclick="editDriver('${d.id}')">Editar</button></td></tr>`).join('')}</tbody></table></div></div>`
 }
 function basesPage(){return `<div class="card"><div class="toolbar"><div><h3>Bases operacionais</h3><p class="muted">O sistema começa com 4 bases, mas permite cadastrar novas.</p></div><button class="primary-btn" id="addBase">+ Nova base</button></div><div class="grid base-cards">${state.bases.map(b=>`<div class="subcard"><div class="toolbar"><div><h3>${esc(b.nome)}</h3><p>${esc(b.localidade)}</p></div>${badge(b.status)}</div><button class="ghost-btn" onclick="editBase('${b.id}')">Editar</button></div>`).join('')}</div></div>`}
-function expensesPage(){let total=state.expenses.reduce((a,b)=>a+Number(b.valor||0),0);return `<div class="grid kpis">${kpi('Despesas registradas',state.expenses.length,'Lançamentos')}${kpi('Total',money(total),'Valor acumulado')}${kpi('Este mês',money(state.expenses.filter(e=>e.data.slice(0,7)===todayISO().slice(0,7)).reduce((a,b)=>a+Number(b.valor||0),0)),'Competência atual')}</div><div class="card" style="margin-top:18px"><div class="toolbar"><div><h3>Gestão de despesas</h3><p class="muted">Descrição, valor, data, forma de pagamento, categoria e base.</p></div><button class="primary-btn" id="addExpense">+ Nova despesa</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Base</th><th>Pagamento</th><th>Responsável</th><th>Valor</th><th></th></tr></thead><tbody>${state.expenses.map(e=>`<tr><td>${new Date(e.data+'T12:00').toLocaleDateString('pt-BR')}</td><td>${esc(e.descricao)}</td><td>${esc(e.categoria)}</td><td>${esc(e.base)}</td><td>${esc(e.pagamento)}</td><td>${esc(e.responsavel||'-')}</td><td><strong>${money(e.valor)}</strong></td><td><button class="row-btn" onclick="deleteExpense('${e.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Nenhuma despesa cadastrada.</td></tr>'}</tbody></table></div></div>`}
+function expensesPage(){
+ let total=state.expenses.reduce((a,b)=>a+Number(b.valor||0),0);
+ let paid=state.expenses.filter(e=>e.statusPagamento==='Pago').reduce((a,b)=>a+Number(b.valor||0),0);
+ let pending=state.expenses.filter(e=>e.statusPagamento==='Aguardando aprovação'||e.statusPagamento==='Agendado').reduce((a,b)=>a+Number(b.valor||0),0);
+ return `<div class="grid kpis">${kpi('Despesas registradas',state.expenses.length,'Lançamentos')}${kpi('Total',money(total),'Valor acumulado')}${kpi('Pagas',money(paid),'Pagamentos concluídos')}${kpi('Pendentes',money(pending),'Aguardando / agendadas','warn')}</div>
+ <div class="card" style="margin-top:18px"><div class="toolbar"><div><h3>Gestão de despesas</h3><p class="muted">Planilha financeira com dados da despesa e da transação.</p></div><div class="top-actions"><button class="ghost-btn" onclick="exportExpensesCSV()">Exportar planilha CSV</button><button class="primary-btn" id="addExpense">+ Nova despesa</button></div></div>
+ <div class="table-wrap"><table class="table expense-table"><thead><tr><th>Data</th><th>Hora</th><th>Descrição</th><th>Categoria</th><th>Base</th><th>Forma</th><th>Status</th><th>Beneficiário</th><th>CPF/CNPJ</th><th>Banco</th><th>Agência</th><th>Conta</th><th>PIX</th><th>Pagador</th><th>Responsável</th><th>Valor</th><th></th></tr></thead><tbody>${state.expenses.map(e=>`<tr><td>${e.data?new Date(e.data+'T12:00').toLocaleDateString('pt-BR'):'-'}</td><td>${esc(e.horario||'-')}</td><td><strong>${esc(e.descricao)}</strong></td><td>${esc(e.categoria||'-')}</td><td>${esc(e.base||'-')}</td><td>${esc(e.pagamento||'-')}</td><td>${paymentBadge(e.statusPagamento)}</td><td>${esc(e.beneficiario||'-')}</td><td>${esc(e.documento||'-')}</td><td>${esc(e.instituicao||'-')}</td><td>${esc(e.agencia||'-')}</td><td>${esc(e.conta||'-')}</td><td>${esc(e.pix||'-')}</td><td>${esc(e.pagador||'-')}</td><td>${esc(e.responsavel||'-')}</td><td><strong>${money(e.valor)}</strong></td><td><button class="row-btn" onclick="deleteExpense('${e.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="17" class="empty">Nenhuma despesa cadastrada.</td></tr>'}</tbody></table></div></div>`
+}
 function usersPage(){return `<div class="card"><div class="toolbar"><div><h3>Usuários administrativos</h3><p class="muted">Perfis de acesso para donos, operação, financeiro e consulta.</p></div><button class="primary-btn" id="addUser">+ Novo usuário</button></div><div class="info-box"><strong>Importante:</strong> GitHub Pages é apenas frontend. Para login seguro dos donos, senha, recuperação de acesso e permissões reais, a próxima etapa precisa conectar um serviço de autenticação/backend.</div><div class="table-wrap"><table class="table"><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Base</th><th>Status</th></tr></thead><tbody>${state.users.map(u=>`<tr><td>${esc(u.nome)}</td><td>${esc(u.email)}</td><td>${esc(u.perfil)}</td><td>${esc(u.base)}</td><td>${badge(u.status)}</td></tr>`).join('')}</tbody></table></div></div>`}
 function iaPage(){return `<div class="grid section-grid"><div class="card"><h3>Assistente operacional</h3><p class="muted">Nesta V5 o assistente analisa os dados locais. Depois podemos conectar uma IA real pelo backend, sem expor chave de API.</p><div class="ai-prompts"><button class="ghost-btn ai-q" data-q="sla">Analisar SLA</button><button class="ghost-btn ai-q" data-q="bases">Comparar bases</button><button class="ghost-btn ai-q" data-q="motoristas">Produtividade de motoristas</button><button class="ghost-btn ai-q" data-q="ocorrencias">Resumir ocorrências</button></div><textarea id="aiQuestion" rows="4" placeholder="Ex.: Qual base precisa de mais atenção?"></textarea><button class="primary-btn" id="aiAsk">Analisar dados</button></div><div class="card"><h3>Resultado</h3><div id="aiAnswer" class="ai-answer">Escolha uma análise ou faça uma pergunta.</div></div></div>`}
 function reports(){let total=state.orders.length,ent=state.orders.filter(x=>x.status==='Entregue').length,occ=state.orders.filter(x=>x.status==='Ocorrência').length;return `<div class="grid kpis">${kpi('Taxa de entrega',total?Math.round(ent/total*100)+'%':'0%','Volumes concluídos')}${kpi('Insucesso',total?Math.round(occ/total*100)+'%':'0%','Ocorrências abertas')}${kpi('Carga processada',total,'Waybills')}${kpi('Dentro do SLA',state.orders.filter(x=>slaText(x)!=='Atrasado').length,'Volumes')}</div><div class="card" style="margin-top:18px"><div class="toolbar"><h3>Exportação operacional</h3><button class="primary-btn" onclick="exportCSV()">Baixar CSV</button></div>${table(state.orders,false)}</div>`}
@@ -118,7 +104,7 @@ $('#driverForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target),id
 function openBase(id=''){let form=$('#baseForm');form.reset();form.elements.id.value=id;if(id){let b=state.bases.find(x=>x.id===id);Object.keys(b).forEach(k=>{if(form.elements[k])form.elements[k].value=b[k]??''})}$('#baseDialog').showModal()} window.editBase=openBase;
 $('#baseForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target),id=f.get('id'),data={id:id||uid(),nome:f.get('nome'),localidade:f.get('localidade'),status:f.get('status')};if(id){let i=state.bases.findIndex(x=>x.id===id),old=state.bases[i].nome;state.bases[i]=data;state.orders.forEach(o=>{if(o.base===old)o.base=data.nome});state.drivers.forEach(d=>{if(d.base===old)d.base=data.nome});state.expenses.forEach(x=>{if(x.base===old)x.base=data.nome})}else state.bases.push(data);save();$('#baseDialog').close();toast('Base salva');render('bases')};
 
-$('#expenseForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);state.expenses.unshift({id:uid(),descricao:f.get('descricao'),valor:Number(f.get('valor')||0),data:f.get('data'),pagamento:f.get('pagamento'),categoria:f.get('categoria'),base:f.get('base'),responsavel:f.get('responsavel'),obs:f.get('obs')});save();$('#expenseDialog').close();toast('Despesa registrada');render('despesas')};
+$('#expenseForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);state.expenses.unshift({id:uid(),descricao:f.get('descricao'),valor:Number(f.get('valor')||0),data:f.get('data'),horario:f.get('horario'),pagamento:f.get('pagamento'),statusPagamento:f.get('statusPagamento'),categoria:f.get('categoria'),base:f.get('base'),beneficiario:f.get('beneficiario'),documento:f.get('documento'),instituicao:f.get('instituicao'),agencia:f.get('agencia'),conta:f.get('conta'),pix:f.get('pix'),pagador:f.get('pagador'),responsavel:f.get('responsavel'),obs:f.get('obs')});save();$('#expenseDialog').close();toast('Despesa registrada');render('despesas')};
 window.deleteExpense=id=>{if(confirm('Excluir esta despesa?')){state.expenses=state.expenses.filter(x=>x.id!==id);save();render('despesas')}};
 $('#userForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);state.users.push({id:uid(),nome:f.get('nome'),email:f.get('email'),perfil:f.get('perfil'),base:f.get('base'),status:f.get('status')});save();$('#userDialog').close();toast('Usuário cadastrado');render('usuarios')};
 
@@ -138,5 +124,12 @@ function runAI(q){q=(q||'').toLowerCase();let ans='';if(q.includes('sla')){let l
 
 $('#importBtn').onclick=()=>$('#fileInput').click();$('#fileInput').onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>importCSV(r.result);r.readAsText(file,'UTF-8')};
 function importCSV(text){let lines=text.trim().split(/\r?\n/);if(lines.length<2){toast('CSV vazio');return}let sep=lines[0].includes(';')?';':',';let h=lines[0].split(sep).map(x=>x.trim().toLowerCase());let added=0;for(let line of lines.slice(1)){let v=line.split(sep).map(x=>x.trim()),g=n=>v[h.indexOf(n)]||'';let id=g('waybill');if(!id||state.orders.some(x=>x.waybill===id))continue;state.orders.push({waybill:id,referencia:g('referencia'),cliente:g('cliente'),destinatario:g('destinatario'),telefone:g('telefone'),endereco:g('endereco'),cidade:g('cidade'),localidade:g('localidade')||g('cidade'),base:g('base')||state.bases[0]?.nome||'Base 1',prazo:g('prazo')||todayISO(),status:'Recebido no DS',volumes:Number(g('volumes')||1),entregador:g('motorista')||'',ultimo:'Importado / Recebido no DS',atualizacao:now(),ocorrencia:''});added++}save();toast(`${added} Waybill(s) importados`);render('recebimento')}
-window.exportCSV=()=>{let h=['waybill','referencia','cliente','destinatario','telefone','endereco','cidade','localidade','base','prazo','status','volumes','entregador','ultimo','atualizacao','ocorrencia'];let q=x=>'"'+String(x??'').replaceAll('"','""')+'"';let csv='\ufeff'+h.join(';')+'\n'+state.orders.map(o=>h.map(k=>q(o[k])).join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='operacao-last-mile.csv';a.click();URL.revokeObjectURL(a.href)};
+window.exportExpensesCSV=()=>{
+ let h=['data','horario','descricao','categoria','base','forma_pagamento','status_pagamento','beneficiario','cpf_cnpj','instituicao_banco','agencia','conta','chave_pix','pagador','responsavel','valor','observacoes'];
+ let q=x=>'"'+String(x??'').replaceAll('"','""')+'"';
+ let rows=state.expenses.map(e=>[e.data,e.horario,e.descricao,e.categoria,e.base,e.pagamento,e.statusPagamento,e.beneficiario,e.documento,e.instituicao,e.agencia,e.conta,e.pix,e.pagador,e.responsavel,Number(e.valor||0).toFixed(2),e.obs]);
+ let csv='\ufeff'+h.join(';')+'\n'+rows.map(r=>r.map(q).join(';')).join('\n');
+ let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='despesas-middia.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)
+};
+window.exportCSV=()=>{let h=['waybill','referencia','cliente','destinatario','telefone','endereco','cidade','localidade','base','prazo','status','volumes','entregador','ultimo','atualizacao','ocorrencia'];let q=x=>'"'+String(x??'').replaceAll('"','""')+'"';let csv='\ufeff'+h.join(';')+'\n'+state.orders.map(o=>h.map(k=>q(o[k])).join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='operacao-last-mile-middia.csv';a.click();URL.revokeObjectURL(a.href)};
 function closeMenu(){$('#sidebar').classList.remove('open');$('#overlay').classList.remove('show')}$('#menuBtn').onclick=()=>{$('#sidebar').classList.toggle('open');$('#overlay').classList.toggle('show')};$('#overlay').onclick=closeMenu;window.onhashchange=()=>render(location.hash.slice(1)||'dashboard');fillDialogOptions();render(location.hash.slice(1)||'dashboard');

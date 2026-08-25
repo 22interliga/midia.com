@@ -1,19 +1,21 @@
-# Last Mile DS — V5
+# Middia.com — Operação Last Mile V6
 
-Versão frontend para GitHub Pages.
+Versão GitHub Pages do painel operacional Last Mile.
 
-## Novidades V5
-- SLA com período (data inicial/final), motorista, base e localidade.
-- Cadastro de motoristas com nome, telefone, nascimento, rota desejada, valor por pacote, banco, agência, conta, PIX e base.
-- Estrutura inicial com 4 bases configuráveis e possibilidade de expansão.
-- Gestão de despesas com descrição, valor, data, forma de pagamento, categoria e base.
-- Usuários/Admin com perfis: Super Admin, Dono/Admin, Operação, Financeiro e Consulta.
-- Aniversariantes do dia e preparação de mensagem de feliz aniversário.
-- Assistente inteligente local para SLA, bases, motoristas e ocorrências.
-- Waybill agora registra base e localidade.
+## V6
+- Identidade visual baseada na logo Middia.com (azul e verde).
+- Logo aplicada no sistema.
+- Gestão de despesas em formato de planilha.
+- Cadastro de despesa/pagamento com dados bancários e de PIX: valor, data, horário, forma, status, beneficiário, CPF/CNPJ, instituição, agência, conta, chave PIX, pagador, responsável, categoria e base.
+- Exportação das despesas para CSV, compatível com Excel.
+- SLA com período, motorista, base e localidade.
+- Cadastro de motoristas com nascimento, rota, valor por pacote, dados bancários, PIX e base.
+- Estrutura de usuários/admin e IA mantidas para futura conexão com backend.
+- Dados fictícios removidos. A V6 usa uma nova chave de armazenamento local, portanto não carrega os dados demonstrativos da V5.
+- Mantidos 4 espaços iniciais de base (`Base 1` a `Base 4`) para serem renomeados com os nomes reais.
 
-## Atenção sobre produção
-GitHub Pages é somente frontend. Login seguro, banco de dados real, disparo automático por WhatsApp/SMS/e-mail e IA real devem ser conectados por backend/API. Não coloque chaves de API ou senhas no JavaScript público.
+## Publicar no GitHub Pages
+Envie todos os arquivos deste pacote para a raiz do repositório e substitua os anteriores. Depois faça Ctrl+F5 ao abrir a página publicada.
 
-## Publicar
-Envie `index.html`, `app.js`, `styles.css`, `manifest.webmanifest` e `sw.js` para a raiz do repositório configurado no GitHub Pages.
+## Observação
+Login seguro, envio automático de aniversário por WhatsApp e IA externa exigem backend/autenticação e não devem guardar senhas/chaves de API no GitHub Pages.

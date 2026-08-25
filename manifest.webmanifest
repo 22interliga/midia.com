@@ -1,9 +1,1 @@
-{
-  "name":"Interliga Last Mile",
-  "short_name":"Last Mile",
-  "start_url":"./",
-  "display":"standalone",
-  "background_color":"#f4f6f8",
-  "theme_color":"#101820",
-  "icons":[]
-}
+{"name":"Last Mile • Operação DS","short_name":"Last Mile DS","start_url":"./","display":"standalone","background_color":"#101820","theme_color":"#101820","icons":[]}

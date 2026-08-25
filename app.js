@@ -1,100 +1,32 @@
-const navItems = [
-  ['dashboard','▦','Dashboard','Visão geral da operação'],
-  ['pedidos','◫','Pedidos','Coletas e entregas cadastradas'],
-  ['despacho','⇄','Despacho','Distribuição de entregas'],
-  ['rotas','⌁','Roteirização','Rotas e sequência de paradas'],
-  ['motoristas','◉','Motoristas','Entregadores e disponibilidade'],
-  ['veiculos','◆','Veículos','Moto e Inter Car'],
-  ['clientes','▣','Clientes','Empresas contratantes'],
-  ['precos','R$','Precificação','Tarifas e faixas de km'],
-  ['financeiro','$','Financeiro','Faturamento, repasses e margem'],
-  ['relatorios','▤','Relatórios','KPIs e desempenho operacional']
-];
-
-const demo = {
-  orders:[
-    {id:'LM-1048',cliente:'Mercado Bahia',destinatario:'Carlos Silva',coleta:'Candeias',entrega:'Madre de Deus',veiculo:'Moto',status:'Em rota',prioridade:'Alta',valor:24.80,volumes:1},
-    {id:'LM-1047',cliente:'Farmácia União',destinatario:'Ana Souza',coleta:'São Francisco do Conde',entrega:'Candeias',veiculo:'Inter Car',status:'Aguardando',prioridade:'Normal',valor:31.20,volumes:3},
-    {id:'LM-1046',cliente:'Loja Central',destinatario:'João Santos',coleta:'Simões Filho',entrega:'Candeias',veiculo:'Moto',status:'Entregue',prioridade:'Normal',valor:18.50,volumes:1},
-    {id:'LM-1045',cliente:'Auto Peças BR',destinatario:'Marcos Lima',coleta:'Candeias',entrega:'São Francisco do Conde',veiculo:'Inter Car',status:'Ocorrência',prioridade:'Urgente',valor:44.90,volumes:4},
-    {id:'LM-1044',cliente:'Mercado Bahia',destinatario:'Paula Reis',coleta:'Madre de Deus',entrega:'Candeias',veiculo:'Moto',status:'Entregue',prioridade:'Normal',valor:21.60,volumes:1}
-  ],
-  drivers:[
-    {nome:'Rafael Santos',veiculo:'Moto',placa:'ABC-1D23',status:'Online',entregas:14,km:68},
-    {nome:'Diego Lima',veiculo:'Inter Car',placa:'QWE-7F90',status:'Em rota',entregas:11,km:91},
-    {nome:'Lucas Rocha',veiculo:'Moto',placa:'JKL-3A77',status:'Online',entregas:17,km:74},
-    {nome:'André Costa',veiculo:'Inter Car',placa:'RTY-5H12',status:'Offline',entregas:8,km:55}
-  ]
-};
-
-const state = JSON.parse(localStorage.getItem('interliga-lastmile') || 'null') || structuredClone(demo);
-const $ = s => document.querySelector(s);
-const money = n => n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const statusBadge = s => {
-  const cls = s==='Entregue'||s==='Online'?'green':s==='Em rota'?'blue':s==='Aguardando'?'orange':s==='Ocorrência'?'red':'';
-  return `<span class="badge ${cls}">${s}</span>`;
-};
-function save(){localStorage.setItem('interliga-lastmile',JSON.stringify(state));}
-function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
-
-const nav = $('#nav');
-nav.innerHTML = navItems.map(([id,icon,label])=>`<button class="nav-btn" data-page="${id}"><span>${icon}</span>${label}</button>`).join('');
-
-function kpi(label,value,delta,cls='good'){return `<div class="card kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="delta ${cls}">${delta}</div></div>`}
-function dashboard(){
-  const delivered=state.orders.filter(o=>o.status==='Entregue').length;
-  const inRoute=state.orders.filter(o=>o.status==='Em rota').length;
-  const pending=state.orders.filter(o=>o.status==='Aguardando').length;
-  return `<div class="grid kpis">
-    ${kpi('Entregas hoje',state.orders.length,'↑ operação ativa')}
-    ${kpi('Entregues',delivered,'SLA 94,7%')}
-    ${kpi('Em rota',inRoute,'Acompanhamento em tempo real','')}
-    ${kpi('Pendentes',pending,'Requer despacho','warn')}
-  </div>
-  <div class="grid section-grid">
-    <div class="card"><h3>Mapa operacional</h3><div class="map-mock">
-      <i class="pin" style="left:18%;top:27%"></i><i class="pin blue" style="left:45%;top:62%"></i><i class="pin orange" style="left:68%;top:24%"></i><i class="pin" style="left:80%;top:70%"></i>
-    </div><div class="legend"><span><i class="dot"></i>Motoristas</span><span><i class="dot blue"></i>Em rota</span><span><i class="dot orange"></i>Pendências</span></div></div>
-    <div class="card"><h3>Operação do dia</h3><div class="mini-list">
-      <div class="mini-item"><div><strong>SLA</strong><span>Meta 95%</span></div><b>94,7%</b></div>
-      <div class="mini-item"><div><strong>Km planejado</strong><span>Rotas geradas</span></div><b>312 km</b></div>
-      <div class="mini-item"><div><strong>Km realizado</strong><span>GPS acumulado</span></div><b>298 km</b></div>
-      <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Progresso operacional</span><b>78%</b></div><div class="progress"><i style="width:78%"></i></div></div>
-    </div></div>
-  </div>`;
-}
-function orders(){return `<div class="card"><div class="toolbar"><input class="search" id="orderSearch" placeholder="Buscar pedido, cliente ou destinatário"><div class="filters"><button class="ghost-btn">Todos</button><button class="ghost-btn">Em rota</button><button class="ghost-btn">Entregues</button></div></div>${ordersTable(state.orders)}</div>`}
-function ordersTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Destinatário</th><th>Trecho</th><th>Veículo</th><th>Status</th><th>Valor</th></tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${o.id}</strong></td><td>${o.cliente}</td><td>${o.destinatario}</td><td>${o.coleta} → ${o.entrega}</td><td>${o.veiculo}</td><td>${statusBadge(o.status)}</td><td>${money(o.valor)}</td></tr>`).join('')}</tbody></table></div>`}
-function dispatch(){const pending=state.orders.filter(o=>o.status==='Aguardando'||o.status==='Ocorrência');return `<div class="grid section-grid"><div class="card"><h3>Entregas disponíveis</h3>${pending.length?ordersTable(pending):'<div class="empty">Nenhuma entrega aguardando despacho.</div>'}</div><div class="card"><h3>Motoristas disponíveis</h3><div class="mini-list">${state.drivers.filter(d=>d.status!=='Offline').map(d=>`<div class="mini-item"><div><strong>${d.nome}</strong><span>${d.veiculo} • ${d.placa}</span></div>${statusBadge(d.status)}</div>`).join('')}</div><button class="primary-btn" style="width:100%;margin-top:14px" onclick="autoDispatch()">Despachar automaticamente</button></div></div>`}
-function routes(){return `<div class="grid section-grid"><div class="card"><h3>Rota LM-R023 • Diego Lima</h3>${['Base Candeias','Farmácia União • Coleta','Ana Souza • Entrega','Mercado Bahia • Entrega','Base Candeias'].map((p,i)=>`<div class="route-row"><div class="route-index">${i+1}</div><div><strong>${p}</strong><div style="font-size:12px;color:var(--muted)">${i===0?'08:00':`${8+i}:1${i} • ${5+i*3} km`}</div></div><span class="badge ${i<2?'green':'blue'}">${i<2?'Concluído':'Próximo'}</span></div>`).join('')}</div><div class="card"><h3>Resumo da rota</h3><div class="mini-list"><div class="mini-item"><span>Distância</span><b>72 km</b></div><div class="mini-item"><span>Duração prevista</span><b>4h 15min</b></div><div class="mini-item"><span>Paradas</span><b>5</b></div><div class="mini-item"><span>Capacidade</span><b>68%</b></div><div class="mini-item"><span>Custo estimado</span><b>${money(138.40)}</b></div></div></div></div>`}
-function drivers(){return `<div class="card">${simpleTable(['Motorista','Veículo','Placa','Status','Entregas','Km'],state.drivers.map(d=>[d.nome,d.veiculo,d.placa,statusBadge(d.status),d.entregas,d.km+' km']))}</div>`}
-function vehicles(){const rows=[['Moto','3 ativos','Até 20 kg','Entregas rápidas'],['Inter Car','2 ativos','Até 250 kg','Volumes e múltiplas paradas']];return `<div class="grid kpis">${kpi('Motos','3','2 online')}${kpi('Inter Car','2','1 em rota')}${kpi('Disponíveis','3','Agora')}${kpi('Em manutenção','0','Tudo operacional')}</div><div class="card" style="margin-top:18px">${simpleTable(['Categoria','Frota','Capacidade','Uso'],rows)}</div>`}
-function clients(){const rows=[['Mercado Bahia','18 entregas','Ativo',money(486.20)],['Farmácia União','12 entregas','Ativo',money(319.70)],['Loja Central','9 entregas','Ativo',money(226.10)],['Auto Peças BR','6 entregas','Ativo',money(284.90)]];return `<div class="card">${simpleTable(['Cliente','Volume hoje','Status','Faturamento'],rows)}</div>`}
-function prices(){return `<div class="grid section-grid"><div class="card"><h3>Moto</h3><div class="mini-list"><div class="mini-item"><span>Taxa inicial</span><b>${money(8)}</b></div><div class="mini-item"><span>Valor por km</span><b>${money(2.4)}</b></div><div class="mini-item"><span>Mínimo</span><b>${money(12)}</b></div><div class="mini-item"><span>Parada adicional</span><b>${money(4)}</b></div></div></div><div class="card"><h3>Inter Car</h3><div class="mini-list"><div class="mini-item"><span>Taxa inicial</span><b>${money(9.99)}</b></div><div class="mini-item"><span>Valor por km</span><b>${money(2.4)}</b></div><div class="mini-item"><span>Mínimo</span><b>${money(15)}</b></div><div class="mini-item"><span>Parada adicional</span><b>${money(6)}</b></div></div></div></div><div class="card" style="margin-top:18px"><h3>Faixas de km</h3>${simpleTable(['Faixa','Regra','Valor'],[['0–5 km','Fixo',money(15)],['5–10 km','Fixo',money(22)],['10–20 km','Fixo',money(35)],['20–30 km','Fixo',money(48)],['Acima de 30 km','Por km',money(2.4)+' / km']])}</div>`}
-function finance(){const receita=state.orders.reduce((a,o)=>a+o.valor,0),repasse=receita*.68,margem=receita-repasse;return `<div class="grid kpis">${kpi('Faturamento',money(receita),'Pedidos cadastrados')}${kpi('Repasses',money(repasse),'68% da operação','')}${kpi('Margem',money(margem),'32% estimada')}${kpi('A receber',money(receita*.42),'Clientes faturados','warn')}</div><div class="card" style="margin-top:18px"><h3>Resumo por cliente</h3>${simpleTable(['Cliente','Entregas','Cobrado','Repasse','Margem'],[['Mercado Bahia','18',money(486.2),money(330.6),money(155.6)],['Farmácia União','12',money(319.7),money(217.4),money(102.3)],['Loja Central','9',money(226.1),money(153.7),money(72.4)]])}</div>`}
-function reports(){return `<div class="grid kpis">${kpi('SLA','94,7%','Meta 95%','warn')}${kpi('Sucesso','96,2%','↑ 1,8%')}${kpi('Custo/entrega',money(16.42),'↓ 4,1%')}${kpi('Km/entrega','7,8 km','↓ 0,6 km')}</div><div class="grid section-grid"><div class="card"><h3>Indicadores</h3>${simpleTable(['KPI','Atual','Meta'],[['Entregas no prazo','94,7%','95%'],['Taxa de sucesso','96,2%','97%'],['Km por entrega','7,8','≤ 8,0'],['Tempo médio','41 min','≤ 45 min']])}</div><div class="card"><h3>Exportações</h3><div class="mini-list"><button class="ghost-btn" onclick="toast('Relatório CSV preparado (demo)')">Exportar CSV</button><button class="ghost-btn" onclick="toast('Relatório XLSX preparado (demo)')">Exportar XLSX</button><button class="ghost-btn" onclick="toast('Relatório PDF preparado (demo)')">Exportar PDF</button></div></div></div>`}
-function simpleTable(headers,rows){return `<div class="table-wrap"><table class="table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
-
-const pages={dashboard, pedidos:orders, despacho:dispatch, rotas:routes, motoristas:drivers, veiculos:vehicles, clientes, precos:prices, financeiro:finance, relatorios:reports};
-function render(page='dashboard'){
-  const item=navItems.find(i=>i[0]===page)||navItems[0];
-  $('#pageTitle').textContent=item[2];$('#pageSubtitle').textContent=item[3];
-  $('#content').innerHTML=pages[item[0]]();
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===item[0]));
-  location.hash=item[0];
-  const search=$('#orderSearch'); if(search) search.addEventListener('input',e=>{const q=e.target.value.toLowerCase();const filtered=state.orders.filter(o=>Object.values(o).join(' ').toLowerCase().includes(q));search.closest('.card').querySelector('.table-wrap').outerHTML=ordersTable(filtered)});
-}
-function autoDispatch(){const order=state.orders.find(o=>o.status==='Aguardando');if(order){order.status='Em rota';save();toast(`${order.id} despachado automaticamente`);render('despacho')}else toast('Sem pedidos aguardando despacho')}
-window.autoDispatch=autoDispatch;window.toast=toast;
-
-nav.addEventListener('click',e=>{const b=e.target.closest('.nav-btn');if(!b)return;render(b.dataset.page);closeMenu()});
-$('#newOrderBtn').addEventListener('click',()=>$('#orderDialog').showModal());
-$('#closeDialogBtn').addEventListener('click',()=>$('#orderDialog').close());
-$('#cancelDialogBtn').addEventListener('click',()=>$('#orderDialog').close());
-$('#orderForm').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.currentTarget);const id='LM-'+(1049+state.orders.length);state.orders.unshift({id,cliente:f.get('cliente'),destinatario:f.get('destinatario'),telefone:f.get('telefone'),coleta:f.get('coleta'),entrega:f.get('entrega'),veiculo:f.get('veiculo'),status:'Aguardando',prioridade:f.get('prioridade'),valor:f.get('veiculo')==='Moto'?18.5:27.9,volumes:Number(f.get('volumes')||1)});save();e.currentTarget.reset();$('#orderDialog').close();toast('Pedido cadastrado com sucesso');render('pedidos')});
-$('#seedBtn').addEventListener('click',()=>{localStorage.removeItem('interliga-lastmile');location.reload()});
-function closeMenu(){$('#sidebar').classList.remove('open');$('#overlay').classList.remove('show')}
-$('#menuBtn').addEventListener('click',()=>{$('#sidebar').classList.toggle('open');$('#overlay').classList.toggle('show')});$('#overlay').addEventListener('click',closeMenu);
-window.addEventListener('hashchange',()=>render(location.hash.slice(1)||'dashboard'));
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-render(location.hash.slice(1)||'dashboard');
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const navItems=[['dashboard','▦','Dashboard','Visão geral da operação DS'],['recebimento','▥','Recebimento DS','Entrada e conferência de carga'],['triagem','⌗','Triagem','Separação e preparação'],['despacho','⇄','Despacho','Distribuição para entregadores'],['rota','⌁','Em rota','Acompanhamento das saídas'],['entregues','✓','Entregues','Baixas e comprovantes'],['ocorrencias','!','Ocorrências','Insucessos e tratativas'],['devolucoes','↩','Devoluções','Retorno de volumes'],['relatorios','▤','Relatórios','SLA e produtividade']];
+const now=()=>new Date().toLocaleString('pt-BR');
+const demo={orders:[
+{waybill:'WB260824001',referencia:'PED-90831',cliente:'Loja Alpha',destinatario:'Carlos Silva',telefone:'71999990001',endereco:'Rua A, 120',cidade:'Salvador',prazo:'2026-08-24',status:'Em rota',volumes:1,entregador:'Rafael Santos',ultimo:'Saiu para entrega',atualizacao:'24/08/2026 18:42',ocorrencia:''},
+{waybill:'WB260824002',referencia:'PED-90832',cliente:'Marketplace Beta',destinatario:'Ana Souza',telefone:'71999990002',endereco:'Av. Central, 45',cidade:'Candeias',prazo:'2026-08-25',status:'Recebido no DS',volumes:2,entregador:'',ultimo:'Recebido no DS',atualizacao:'24/08/2026 17:10',ocorrencia:''},
+{waybill:'WB260824003',referencia:'PED-90833',cliente:'Loja Alpha',destinatario:'João Santos',telefone:'71999990003',endereco:'Rua das Flores, 9',cidade:'Simões Filho',prazo:'2026-08-24',status:'Entregue',volumes:1,entregador:'Lucas Rocha',ultimo:'Entregue',atualizacao:'24/08/2026 16:25',ocorrencia:''},
+{waybill:'WB260824004',referencia:'PED-90834',cliente:'Seller Gamma',destinatario:'Marcos Lima',telefone:'71999990004',endereco:'Rua B, 77',cidade:'Salvador',prazo:'2026-08-23',status:'Ocorrência',volumes:1,entregador:'Diego Lima',ultimo:'Tentativa sem sucesso',atualizacao:'24/08/2026 15:18',ocorrencia:'Destinatário ausente'},
+{waybill:'WB260824005',referencia:'PED-90835',cliente:'Marketplace Beta',destinatario:'Paula Reis',telefone:'71999990005',endereco:'Praça Norte, 20',cidade:'Candeias',prazo:'2026-08-25',status:'Triagem',volumes:3,entregador:'',ultimo:'Em triagem',atualizacao:'24/08/2026 18:05',ocorrencia:''}
+],drivers:['Rafael Santos','Diego Lima','Lucas Rocha','André Costa']};
+const KEY='last-mile-ds-v4'; let state=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(demo); const save=()=>localStorage.setItem(KEY,JSON.stringify(state));
+function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2200)}
+function badge(s){let c=s==='Entregue'?'green':s==='Ocorrência'||s==='Devolução'?'red':s==='Em rota'?'blue':s==='Triagem'||s==='Despachado'?'orange':'';return `<span class="badge ${c}">${s}</span>`}
+function sla(o){const d=new Date(o.prazo+'T23:59:59'), today=new Date(); if(o.status==='Entregue')return '<span class="sla ok">Concluído</span>'; const days=Math.ceil((d-today)/86400000);return days<0?'<span class="sla late">Atrasado</span>':days===0?'<span class="sla warn">Vence hoje</span>':`<span class="sla ok">${days}d restante</span>`}
+function kpi(t,v,s,c=''){return `<div class="card kpi ${c}"><span>${t}</span><strong>${v}</strong><small>${s}</small></div>`}
+function table(rows,actions=true){return `<div class="table-wrap"><table class="table"><thead><tr><th>Waybill</th><th>Referência</th><th>Cliente</th><th>Destinatário</th><th>Cidade</th><th>Prazo</th><th>SLA</th><th>Status</th><th>Última atualização</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${o.waybill}</strong></td><td>${o.referencia||'-'}</td><td>${o.cliente}</td><td>${o.destinatario}</td><td>${o.cidade}</td><td>${new Date(o.prazo+'T12:00').toLocaleDateString('pt-BR')}</td><td>${sla(o)}</td><td>${badge(o.status)}</td><td><small>${o.ultimo}<br>${o.atualizacao}</small></td>${actions?`<td><button class="row-btn" onclick="openActions('${o.waybill}')">•••</button></td>`:''}</tr>`).join('')||'<tr><td colspan="10" class="empty">Nenhum volume nesta etapa.</td></tr>'}</tbody></table></div>`}
+function dashboard(){let n=state.orders.length,e=state.orders.filter(x=>x.status==='Entregue').length,r=state.orders.filter(x=>x.status==='Em rota').length,oc=state.orders.filter(x=>x.status==='Ocorrência').length,late=state.orders.filter(x=>slaText(x)==='Atrasado').length;return `<div class="grid kpis">${kpi('Carga total',n,'Waybills na operação')}${kpi('Em rota',r,'Saídas ativas')}${kpi('Entregues',e,'Baixas concluídas')}${kpi('Ocorrências',oc,'Requer tratativa','warn')}${kpi('SLA vencido',late,'Volumes atrasados','danger')}</div><div class="grid section-grid"><div class="card"><h3>Fluxo operacional</h3><div class="flow">${['Recebido no DS','Triagem','Despachado','Em rota','Entregue'].map(s=>`<div><b>${state.orders.filter(x=>x.status===s).length}</b><span>${s}</span></div>`).join('')}</div></div><div class="card"><h3>Atenção operacional</h3><div class="mini-list">${state.orders.filter(x=>x.status==='Ocorrência'||slaText(x)==='Atrasado').map(x=>`<div class="mini-item"><div><strong>${x.waybill}</strong><span>${x.ocorrencia||slaText(x)} • ${x.cidade}</span></div>${badge(x.status)}</div>`).join('')||'<div class="empty">Sem pendências críticas.</div>'}</div></div></div>`}
+function slaText(o){const d=new Date(o.prazo+'T23:59:59');if(o.status==='Entregue')return'Concluído';return d<new Date()?'Atrasado':d.toDateString()===new Date().toDateString()?'Vence hoje':'No prazo'}
+function listPage(status,title,help){let rows=status==='Recebimento'?state.orders.filter(x=>x.status==='Recebido no DS'):status==='Triagem'?state.orders.filter(x=>x.status==='Triagem'):status==='Despacho'?state.orders.filter(x=>['Despachado','Recebido no DS','Triagem'].includes(x.status)):status==='Em rota'?state.orders.filter(x=>x.status==='Em rota'):status==='Entregue'?state.orders.filter(x=>x.status==='Entregue'):status==='Ocorrência'?state.orders.filter(x=>x.status==='Ocorrência'):state.orders.filter(x=>x.status==='Devolução');return `<div class="card"><div class="toolbar"><input class="search" id="search" placeholder="Buscar Waybill, referência, cliente ou destinatário"><span class="toolbar-note">${help}</span></div>${table(rows)}</div>`}
+function reports(){let total=state.orders.length,ent=state.orders.filter(x=>x.status==='Entregue').length,occ=state.orders.filter(x=>x.status==='Ocorrência').length;return `<div class="grid kpis">${kpi('Taxa de entrega',total?Math.round(ent/total*100)+'%':'0%','Volumes concluídos')}${kpi('Insucesso',total?Math.round(occ/total*100)+'%':'0%','Ocorrências abertas')}${kpi('Carga processada',total,'Waybills')}${kpi('Dentro do SLA',state.orders.filter(x=>slaText(x)!=='Atrasado').length,'Volumes')}</div><div class="card" style="margin-top:18px"><div class="toolbar"><h3>Exportação operacional</h3><button class="primary-btn" onclick="exportCSV()">Baixar CSV</button></div>${table(state.orders,false)}</div>`}
+const pages={dashboard,recebimento:()=>listPage('Recebimento','Recebimento','Volumes aguardando triagem'),triagem:()=>listPage('Triagem','Triagem','Volumes em separação'),despacho:()=>listPage('Despacho','Despacho','Selecione ••• para avançar o status'),rota:()=>listPage('Em rota','Em rota','Acompanhamento de entregadores'),entregues:()=>listPage('Entregue','Entregues','Histórico de baixas'),ocorrencias:()=>listPage('Ocorrência','Ocorrências','Volumes que precisam de tratativa'),devolucoes:()=>listPage('Devolução','Devoluções','Retorno ao remetente'),relatorios:reports};
+function render(p='dashboard'){let item=navItems.find(x=>x[0]===p)||navItems[0];$('#pageTitle').textContent=item[2];$('#pageSubtitle').textContent=item[3];$('#content').innerHTML=pages[item[0]]();$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===item[0]));history.replaceState(null,'','#'+item[0]);let s=$('#search');if(s)s.oninput=e=>{let q=e.target.value.toLowerCase();$$('tbody tr').forEach(tr=>tr.style.display=tr.innerText.toLowerCase().includes(q)?'':'none')}}
+$('#nav').innerHTML=navItems.map(x=>`<button class="nav-btn" data-page="${x[0]}"><span>${x[1]}</span><div><strong>${x[2]}</strong><small>${x[3]}</small></div></button>`).join('');$('#nav').onclick=e=>{let b=e.target.closest('.nav-btn');if(b){render(b.dataset.page);closeMenu()}};
+window.openActions=id=>{let o=state.orders.find(x=>x.waybill===id);if(!o)return;let options=o.status==='Recebido no DS'?['Triagem']:o.status==='Triagem'?['Despachado']:o.status==='Despachado'?['Em rota']:o.status==='Em rota'?['Entregue','Ocorrência']:o.status==='Ocorrência'?['Em rota','Devolução']:o.status==='Devolução'?[]:[];let choice=prompt(`${id} — ${o.status}\nPróximo status:\n${options.map((x,i)=>`${i+1}. ${x}`).join('\n')}\n0. Registrar ocorrência`);if(choice==='0'){openOcc(id);return}let next=options[Number(choice)-1];if(next){o.status=next;o.ultimo=next==='Entregue'?'Entregue':next;o.atualizacao=now();save();toast(`${id}: ${next}`);render(location.hash.slice(1)||'dashboard')}};
+function openOcc(id){let o=state.orders.find(x=>x.waybill===id);$('#occForm [name=waybill]').value=id;$('#occWb').textContent=id+' • '+o.destinatario;$('#occDialog').showModal()} window.openOcc=openOcc;
+$('#occForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target),o=state.orders.find(x=>x.waybill===f.get('waybill'));o.status='Ocorrência';o.ocorrencia=f.get('tipo');o.ultimo='Tentativa sem sucesso';o.atualizacao=now();save();$('#occDialog').close();toast('Ocorrência registrada');render('ocorrencias')};
+$('#newBtn').onclick=()=>$('#wbDialog').showModal();$$('.close').forEach(b=>b.onclick=()=>$('#wbDialog').close());$$('.close-occ').forEach(b=>b.onclick=()=>$('#occDialog').close());
+$('#wbForm').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target),id=f.get('waybill').trim();if(state.orders.some(x=>x.waybill===id)){toast('Waybill já cadastrado');return}state.orders.unshift({waybill:id,referencia:f.get('referencia'),cliente:f.get('cliente'),destinatario:f.get('destinatario'),telefone:f.get('telefone'),endereco:f.get('endereco'),cidade:f.get('cidade'),prazo:f.get('prazo'),status:'Recebido no DS',volumes:Number(f.get('volumes')||1),entregador:'',ultimo:'Recebido no DS',atualizacao:now(),ocorrencia:''});save();e.target.reset();$('#wbDialog').close();toast('Waybill recebido no DS');render('recebimento')};
+$('#importBtn').onclick=()=>$('#fileInput').click();$('#fileInput').onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>importCSV(r.result);r.readAsText(file,'UTF-8')};
+function importCSV(text){let lines=text.trim().split(/\r?\n/);if(lines.length<2){toast('CSV vazio');return}let sep=lines[0].includes(';')?';':',';let h=lines[0].split(sep).map(x=>x.trim().toLowerCase());let added=0;for(let line of lines.slice(1)){let v=line.split(sep).map(x=>x.trim()),g=n=>v[h.indexOf(n)]||'';let id=g('waybill');if(!id||state.orders.some(x=>x.waybill===id))continue;state.orders.push({waybill:id,referencia:g('referencia'),cliente:g('cliente'),destinatario:g('destinatario'),telefone:g('telefone'),endereco:g('endereco'),cidade:g('cidade'),prazo:g('prazo')||new Date().toISOString().slice(0,10),status:'Recebido no DS',volumes:Number(g('volumes')||1),entregador:'',ultimo:'Importado / Recebido no DS',atualizacao:now(),ocorrencia:''});added++}save();toast(`${added} Waybill(s) importados`);render('recebimento')}
+window.exportCSV=()=>{let h=['waybill','referencia','cliente','destinatario','telefone','endereco','cidade','prazo','status','volumes','entregador','ultimo','atualizacao','ocorrencia'];let esc=x=>'"'+String(x??'').replaceAll('"','""')+'"';let csv='\ufeff'+h.join(';')+'\n'+state.orders.map(o=>h.map(k=>esc(o[k])).join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='operacao-last-mile.csv';a.click();URL.revokeObjectURL(a.href)};
+function closeMenu(){$('#sidebar').classList.remove('open');$('#overlay').classList.remove('show')}$('#menuBtn').onclick=()=>{$('#sidebar').classList.toggle('open');$('#overlay').classList.toggle('show')};$('#overlay').onclick=closeMenu;window.onhashchange=()=>render(location.hash.slice(1)||'dashboard');render(location.hash.slice(1)||'dashboard');

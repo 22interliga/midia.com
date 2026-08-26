@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const navItems=[
- ['dashboard','▦','Dashboard','Visão geral da operação DS'],['recebimento','▥','Recebimento DS','Entrada e conferência de carga'],['triagem','⌗','Triagem','Separação e preparação'],['despacho','⇄','Despacho','Distribuição para motoristas'],['rota','⌁','Em rota','Acompanhamento das saídas'],['entregues','✓','Entregues','Baixas e comprovantes'],['ocorrencias','!','Ocorrências','Insucessos e tratativas'],['devolucoes','↩','Devoluções','Retorno de volumes'],
+ ['dashboard','▦','Dashboard','Visão geral da operação DS'],['piso','▤','Piso','Volumes que não saíram para entrega'],['recebimento','▥','Recebimento DS','Entrada e conferência de carga'],['triagem','⌗','Triagem','Separação e preparação'],['despacho','⇄','Despacho','Distribuição para motoristas'],['rota','⌁','Em rota','Acompanhamento das saídas'],['entregues','✓','Entregues','Baixas e comprovantes'],['ocorrencias','!','Ocorrências','Insucessos e tratativas'],['devolucoes','↩','Devoluções','Retorno de volumes'],
  ['sla','◷','SLA','Período, motorista, base e localidade'],['motoristas','♙','Motoristas','Cadastro e dados bancários'],['bases','⌂','Bases','4 bases operacionais e expansão'],['despesas','$','Despesas','Gestão de despesas'],['usuarios','⚿','Usuários / Admin','Perfis e permissões'],['ia','✦','IA','Análises inteligentes'],['relatorios','▤','Relatórios','Indicadores e produtividade']
 ];
 const now=()=>new Date().toLocaleString('pt-BR');
@@ -21,7 +21,7 @@ const initialState={
  expenses:[],
  users:[]
 };
-const KEY='middia-last-mile-v6';
+const KEY='middia-last-mile-v7';
 let state=JSON.parse(localStorage.getItem(KEY)||'null') || structuredClone(initialState);
 const save=()=>localStorage.setItem(KEY,JSON.stringify(state)); save();
 
@@ -36,10 +36,15 @@ function driverOptions(includeAll=false){return `${includeAll?'<option value="">
 function fillDialogOptions(){['#wbBase','#driverBase','#expenseBase'].forEach(sel=>{let x=$(sel);if(x)x.innerHTML=baseOptions(false)});let u=$('#userBase');if(u)u.innerHTML='<option value="Todas">Todas as bases</option>'+state.bases.map(b=>`<option>${esc(b.nome)}</option>`).join('')}
 function table(rows,actions=true){return `<div class="table-wrap"><table class="table"><thead><tr><th>Waybill</th><th>Referência</th><th>Cliente</th><th>Destinatário</th><th>Base</th><th>Localidade</th><th>Motorista</th><th>Prazo</th><th>SLA</th><th>Status</th><th>Última atualização</th>${actions?'<th>Ações</th>':''}</tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${esc(o.waybill)}</strong></td><td>${esc(o.referencia||'-')}</td><td>${esc(o.cliente)}</td><td>${esc(o.destinatario)}</td><td>${esc(o.base||'-')}</td><td>${esc(o.localidade||o.cidade||'-')}</td><td>${esc(o.entregador||'-')}</td><td>${new Date(o.prazo+'T12:00').toLocaleDateString('pt-BR')}</td><td>${sla(o)}</td><td>${badge(o.status)}</td><td><small>${esc(o.ultimo)}<br>${esc(o.atualizacao)}</small></td>${actions?`<td><button class="row-btn" onclick="openActions('${esc(o.waybill)}')">•••</button></td>`:''}</tr>`).join('')||'<tr><td colspan="12" class="empty">Nenhum volume nesta etapa.</td></tr>'}</tbody></table></div>`}
 
+function norm(s){return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()}
+function parseDateAny(v){let s=String(v||'').trim();if(!s)return'';let m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;let d=new Date(s);return isNaN(d)?'':d.toISOString().slice(0,10)}
+function floorFlag(o){if(o.piso===true)return true;let s=norm(o.lastScanStatus||o.ultimo||o.status);if(!s)return false;let saiu=['out for delivery','em rota','saiu para entrega','despach','dispatch','entregue','delivered','delivery success'];if(saiu.some(x=>s.includes(x)))return false;let piso=['received','recebido','arrival','arrived','warehouse','hub','station','ds','triagem','sorting','sort','inbound','at base','na base','piso'];return piso.some(x=>s.includes(x))}
+function operationalTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>Waybill</th><th>Último status</th><th>Tipo ocorrência</th><th>Motivo</th><th>Data/Hora ocorrência</th><th>Cidade</th><th>Localidade</th><th>Endereço</th><th>Piso</th></tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${esc(o.waybill)}</strong></td><td>${esc(o.lastScanStatus||o.ultimo||'-')}</td><td>${esc(o.lastProblemType||'-')}</td><td>${esc(o.lastProblemReason||o.ocorrencia||'-')}</td><td>${esc(o.lastProblemDate||'-')}</td><td>${esc(o.cidade||'-')}</td><td>${esc(o.localidade||'-')}</td><td>${esc(o.endereco||'-')}</td><td>${floorFlag(o)?'<span class="badge orange">Ficou no piso</span>':'<span class="badge green">Saiu do piso</span>'}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nenhum volume encontrado.</td></tr>'}</tbody></table></div>`}
+function pisoPage(){let rows=state.orders.filter(floorFlag);return `<div class="grid kpis">${kpi('Ficaram no piso',rows.length,'Volumes sem evidência de despacho/rota','warn')}${kpi('Carga importada',state.orders.length,'Waybills no arquivo')}${kpi('Saíram do piso',state.orders.length-rows.length,'Despachados, em rota ou entregues')}</div><div class="card" style="margin-top:18px"><div class="toolbar"><div><h3>Volumes que ficaram no piso</h3><p class="muted">Regra: o último scan indica recebimento/base/triagem e não indica despacho, saída para entrega, em rota ou entrega. Use esta lista para conferência operacional.</p></div><button class="primary-btn" onclick="exportPisoCSV()">Exportar piso CSV</button></div>${operationalTable(rows)}</div>`}
 function dashboard(){
- let n=state.orders.length,e=state.orders.filter(x=>x.status==='Entregue').length,r=state.orders.filter(x=>x.status==='Em rota').length,oc=state.orders.filter(x=>x.status==='Ocorrência').length,late=state.orders.filter(x=>slaText(x)==='Atrasado').length;
+ let n=state.orders.length,e=state.orders.filter(x=>x.status==='Entregue').length,r=state.orders.filter(x=>x.status==='Em rota').length,oc=state.orders.filter(x=>x.status==='Ocorrência').length,late=state.orders.filter(x=>slaText(x)==='Atrasado').length,piso=state.orders.filter(floorFlag).length;
  let birthdays=state.drivers.filter(isBirthdayToday);
- return `<div class="grid kpis">${kpi('Carga total',n,'Waybills na operação')}${kpi('Em rota',r,'Saídas ativas')}${kpi('Entregues',e,'Baixas concluídas')}${kpi('Ocorrências',oc,'Requer tratativa','warn')}${kpi('SLA vencido',late,'Volumes atrasados','danger')}</div>
+ return `<div class="grid kpis">${kpi('Carga total',n,'Waybills na operação')}${kpi('No piso',piso,'Não saíram para entrega','warn')}${kpi('Em rota',r,'Saídas ativas')}${kpi('Entregues',e,'Baixas concluídas')}${kpi('Ocorrências',oc,'Requer tratativa','warn')}${kpi('SLA vencido',late,'Volumes atrasados','danger')}</div>
  <div class="grid section-grid"><div class="card"><h3>Fluxo operacional</h3><div class="flow">${['Recebido no DS','Triagem','Despachado','Em rota','Entregue'].map(s=>`<div><b>${state.orders.filter(x=>x.status===s).length}</b><span>${s}</span></div>`).join('')}</div></div>
  <div class="card"><h3>Atenção operacional</h3><div class="mini-list">${state.orders.filter(x=>x.status==='Ocorrência'||slaText(x)==='Atrasado').map(x=>`<div class="mini-item"><div><strong>${esc(x.waybill)}</strong><span>${esc(x.ocorrencia||slaText(x))} • ${esc(x.base)}</span></div>${badge(x.status)}</div>`).join('')||'<div class="empty">Sem pendências críticas.</div>'}</div></div></div>
  <div class="card" style="margin-top:18px"><div class="toolbar"><div><h3>Aniversariantes de hoje</h3><p class="muted">A data de nascimento do cadastro alimenta esta automação.</p></div></div>${birthdays.length?birthdays.map(d=>`<div class="mini-item"><div><strong>${esc(d.nome)}</strong><span>${esc(d.telefone)} • ${esc(d.base)}</span></div><button class="ghost-btn" onclick="birthdayMessage('${d.id}')">Preparar mensagem</button></div>`).join(''):'<div class="empty">Nenhum motorista aniversariando hoje.</div>'}</div>`
@@ -123,7 +128,37 @@ function runAI(q){q=(q||'').toLowerCase();let ans='';if(q.includes('sla')){let l
 }
 
 $('#importBtn').onclick=()=>$('#fileInput').click();$('#fileInput').onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>importCSV(r.result);r.readAsText(file,'UTF-8')};
-function importCSV(text){let lines=text.trim().split(/\r?\n/);if(lines.length<2){toast('CSV vazio');return}let sep=lines[0].includes(';')?';':',';let h=lines[0].split(sep).map(x=>x.trim().toLowerCase());let added=0;for(let line of lines.slice(1)){let v=line.split(sep).map(x=>x.trim()),g=n=>v[h.indexOf(n)]||'';let id=g('waybill');if(!id||state.orders.some(x=>x.waybill===id))continue;state.orders.push({waybill:id,referencia:g('referencia'),cliente:g('cliente'),destinatario:g('destinatario'),telefone:g('telefone'),endereco:g('endereco'),cidade:g('cidade'),localidade:g('localidade')||g('cidade'),base:g('base')||state.bases[0]?.nome||'Base 1',prazo:g('prazo')||todayISO(),status:'Recebido no DS',volumes:Number(g('volumes')||1),entregador:g('motorista')||'',ultimo:'Importado / Recebido no DS',atualizacao:now(),ocorrencia:''});added++}save();toast(`${added} Waybill(s) importados`);render('recebimento')}
+function splitCSVLine(line,sep){let out=[],cur='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++}else q=!q}else if(c===sep&&!q){out.push(cur.trim());cur=''}else cur+=c}out.push(cur.trim());return out}
+function importCSV(text){
+ let lines=String(text||'').replace(/^\ufeff/,'').split(/\r?\n/).filter(x=>x.trim());if(lines.length<2){toast('Arquivo CSV vazio');return}
+ let first=lines[0], sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
+ let headers=splitCSVLine(first,sep), hn=headers.map(norm);
+ const aliases={
+  waybill:['waybill no','waybill','waybill number','tracking number','tracking no'],
+  scan:['last scan status','ultimo status','último status','last status'],
+  ptype:['last problem type','tipo da ultima ocorrencia','tipo ocorrência','problem type'],
+  preason:['last problem reason','motivo da ultima ocorrencia','motivo ocorrência','problem reason'],
+  pdate:['last problem date','data da ultima ocorrencia','data ocorrência','problem date'],
+  city:['consignee city','cidade destinatario','cidade'],
+  area:['consignee area','localidade','bairro','area'],
+  address:['consignee address','endereco destinatario','endereço','endereco'],
+  base:['base','ds','station','hub'],
+  driver:['motorista','driver','courier']
+ };
+ const idx=k=>{for(let a of aliases[k]){let i=hn.indexOf(norm(a));if(i>=0)return i}return -1};
+ let ix={};Object.keys(aliases).forEach(k=>ix[k]=idx(k));
+ if(ix.waybill<0||ix.scan<0){alert('Não encontrei as colunas obrigatórias Waybill No e Last Scan Status.\n\nO importador procura: Waybill No, Last Scan Status, Last Problem Type, Last Problem Reason, Last Problem Date, Consignee City, Consignee Area e Consignee Address.');return}
+ let added=0,updated=0;
+ for(let line of lines.slice(1)){let v=splitCSVLine(line,sep),g=k=>ix[k]>=0?(v[ix[k]]||''):'';let id=g('waybill').trim();if(!id)continue;
+  let scan=g('scan'), ptype=g('ptype'), preason=g('preason'), pdate=g('pdate'), city=g('city'), area=g('area'), address=g('address'), base=g('base')||state.bases[0]?.nome||'Base 1';
+  let temp={lastScanStatus:scan,ultimo:scan,status:scan}; let isFloor=floorFlag(temp);
+  let mapped=norm(scan).includes('delivered')||norm(scan).includes('entregue')?'Entregue':norm(scan).includes('out for delivery')||norm(scan).includes('em rota')||norm(scan).includes('saiu para entrega')?'Em rota':norm(scan).includes('dispatch')||norm(scan).includes('despach')?'Despachado':isFloor?'Recebido no DS':'Recebido no DS';
+  let obj={waybill:id,referencia:'',cliente:'',destinatario:'',telefone:'',endereco:address,cidade:city,localidade:area||city,base,prazo:parseDateAny(pdate)||todayISO(),status:mapped,volumes:1,entregador:g('driver')||'',ultimo:scan||'Importado',atualizacao:now(),ocorrencia:preason||ptype,lastScanStatus:scan,lastProblemType:ptype,lastProblemReason:preason,lastProblemDate:pdate,piso:isFloor};
+  let old=state.orders.find(x=>x.waybill===id);if(old){Object.assign(old,obj);updated++}else{state.orders.push(obj);added++}
+ }
+ save();alert(`Importação concluída.\n\n${added} Waybill(s) novos\n${updated} atualizado(s)\n${state.orders.filter(floorFlag).length} identificado(s) como FICOU NO PISO`);render('piso')
+}
+window.exportPisoCSV=()=>{let rows=state.orders.filter(floorFlag),h=['Waybill No','Last Scan Status','Last Problem Type','Last Problem Reason','Last Problem Date','Consignee City','Consignee Area','Consignee Address','Piso'];let q=x=>'"'+String(x??'').replaceAll('"','""')+'"';let csv='\ufeff'+h.join(';')+'\n'+rows.map(o=>[o.waybill,o.lastScanStatus,o.lastProblemType,o.lastProblemReason,o.lastProblemDate,o.cidade,o.localidade,o.endereco,'Ficou no piso'].map(q).join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='volumes-ficaram-no-piso.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)};
 window.exportExpensesCSV=()=>{
  let h=['data','horario','descricao','categoria','base','forma_pagamento','status_pagamento','beneficiario','cpf_cnpj','instituicao_banco','agencia','conta','chave_pix','pagador','responsavel','valor','observacoes'];
  let q=x=>'"'+String(x??'').replaceAll('"','""')+'"';

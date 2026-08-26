@@ -1,18 +1,12 @@
-# Middia.com — Last Mile DS V7
+# Middia.com — Last Mile V9
 
-Versão operacional com importação do arquivo de acompanhamento e identificação automática de volumes que ficaram no piso.
+Correção de estabilidade da V8.
 
-## Colunas reconhecidas na importação
-- Waybill No
-- Last Scan Status
-- Last Problem Type
-- Last Problem Reason
-- Last Problem Date
-- Consignee City
-- Consignee Area
-- Consignee Address
+- Corrigida a aba **Piso** (`pages[item[0]] is not a function`).
+- Mantida a regra de importação real da V8.
+- Importação continua reconhecendo CSV, XLS e XLSX.
+- Proteção adicional de renderização para páginas desconhecidas.
+- Cache atualizado para V9 e arquivos principais com versionamento para evitar mistura com versões antigas no GitHub Pages.
+- Rodapé atualizado para v9.0.
 
-## Piso
-A aba Piso lista volumes cujo último scan indica recebimento/base/triagem e não indica despacho, saída para entrega, em rota ou entrega. A lista pode ser exportada em CSV.
-
-Publique todos os arquivos na raiz do GitHub Pages.
+Depois de publicar no GitHub Pages, faça Ctrl+F5 uma vez.

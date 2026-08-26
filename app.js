@@ -38,8 +38,8 @@ function table(rows,actions=true){return `<div class="table-wrap"><table class="
 
 function norm(s){return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()}
 function parseDateAny(v){let s=String(v||'').trim();if(!s)return'';let m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;let d=new Date(s);return isNaN(d)?'':d.toISOString().slice(0,10)}
-function floorFlag(o){if(o.piso===true)return true;let s=norm(o.lastScanStatus||o.ultimo||o.status);if(!s)return false;let saiu=['out for delivery','em rota','saiu para entrega','despach','dispatch','entregue','delivered','delivery success'];if(saiu.some(x=>s.includes(x)))return false;let piso=['received','recebido','arrival','arrived','warehouse','hub','station','ds','triagem','sorting','sort','inbound','at base','na base','piso'];return piso.some(x=>s.includes(x))}
-function operationalTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>Waybill</th><th>Último status</th><th>Tipo ocorrência</th><th>Motivo</th><th>Data/Hora ocorrência</th><th>Cidade</th><th>Localidade</th><th>Endereço</th><th>Piso</th></tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${esc(o.waybill)}</strong></td><td>${esc(o.lastScanStatus||o.ultimo||'-')}</td><td>${esc(o.lastProblemType||'-')}</td><td>${esc(o.lastProblemReason||o.ocorrencia||'-')}</td><td>${esc(o.lastProblemDate||'-')}</td><td>${esc(o.cidade||'-')}</td><td>${esc(o.localidade||'-')}</td><td>${esc(o.endereco||'-')}</td><td>${floorFlag(o)?'<span class="badge orange">Ficou no piso</span>':'<span class="badge green">Saiu do piso</span>'}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nenhum volume encontrado.</td></tr>'}</tbody></table></div>`}
+function floorFlag(o){let s=norm(o.lastScanStatus||o.ultimo||o.status),inv=norm(o.inventoryType||''),drv=String(o.entregador||'').trim();let saiu=['out for delivery','em rota','saiu para entrega','despach','dispatch','entregue','delivered','delivery success'];if(saiu.some(x=>s.includes(x)))return false;if(drv&&(/em rota|out for delivery|saiu para entrega/.test(s)))return false;let pisoScan=['received','recebido','arrival','arrived','warehouse','hub','station','ds','triagem','sorting','sort','inbound','at base','na base','piso'];let pisoInv=['station','warehouse','hub','ds','base','inventory'];return pisoScan.some(x=>s.includes(x))||pisoInv.some(x=>inv.includes(x))}
+function operationalTable(rows){return `<div class="table-wrap"><table class="table"><thead><tr><th>Waybill</th><th>Último scan</th><th>Data último scan</th><th>Inventory Type</th><th>Motorista</th><th>Ocorrência</th><th>Cidade</th><th>CEP</th><th>Piso</th></tr></thead><tbody>${rows.map(o=>`<tr><td><strong>${esc(o.waybill)}</strong></td><td>${esc(o.lastScanStatus||o.ultimo||'-')}</td><td>${esc(o.lastScanDate||o.atualizacao||'-')}</td><td>${esc(o.inventoryType||'-')}</td><td>${esc(o.entregador||'-')}</td><td>${esc(o.lastProblemReason||o.lastProblemType||'-')}</td><td>${esc(o.cidade||'-')}</td><td>${esc(o.zipCode||'-')}</td><td>${floorFlag(o)?'<span class="badge orange">Ficou no piso</span>':'<span class="badge green">Saiu do piso</span>'}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nenhum volume encontrado.</td></tr>'}</tbody></table></div>`}
 function pisoPage(){let rows=state.orders.filter(floorFlag);return `<div class="grid kpis">${kpi('Ficaram no piso',rows.length,'Volumes sem evidência de despacho/rota','warn')}${kpi('Carga importada',state.orders.length,'Waybills no arquivo')}${kpi('Saíram do piso',state.orders.length-rows.length,'Despachados, em rota ou entregues')}</div><div class="card" style="margin-top:18px"><div class="toolbar"><div><h3>Volumes que ficaram no piso</h3><p class="muted">Regra: o último scan indica recebimento/base/triagem e não indica despacho, saída para entrega, em rota ou entrega. Use esta lista para conferência operacional.</p></div><button class="primary-btn" onclick="exportPisoCSV()">Exportar piso CSV</button></div>${operationalTable(rows)}</div>`}
 function dashboard(){
  let n=state.orders.length,e=state.orders.filter(x=>x.status==='Entregue').length,r=state.orders.filter(x=>x.status==='Em rota').length,oc=state.orders.filter(x=>x.status==='Ocorrência').length,late=state.orders.filter(x=>slaText(x)==='Atrasado').length,piso=state.orders.filter(floorFlag).length;
@@ -127,33 +127,65 @@ function runAI(q){q=(q||'').toLowerCase();let ans='';if(q.includes('sla')){let l
  $('#aiAnswer').textContent=ans;
 }
 
-$('#importBtn').onclick=()=>$('#fileInput').click();$('#fileInput').onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>importCSV(r.result);r.readAsText(file,'UTF-8')};
+$('#importBtn').onclick=()=>$('#fileInput').click();
+$('#fileInput').onchange=async e=>{
+ let file=e.target.files[0]; if(!file)return;
+ try{
+  let ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(ext==='csv'){
+   let text=await file.text(); importCSV(text);
+  }else{
+   if(typeof XLSX==='undefined'){alert('Leitor de Excel não carregou. Verifique a internet e atualize a página.');return}
+   let buf=await file.arrayBuffer();
+   let wb=XLSX.read(buf,{type:'array',cellDates:true});
+   let ws=wb.Sheets[wb.SheetNames[0]];
+   let rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,dateNF:'dd/mm/yyyy hh:mm:ss'});
+   importRows(rows);
+  }
+ }catch(err){console.error(err);alert('Não foi possível ler o arquivo. '+(err?.message||''))}
+ e.target.value='';
+};
 function splitCSVLine(line,sep){let out=[],cur='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++}else q=!q}else if(c===sep&&!q){out.push(cur.trim());cur=''}else cur+=c}out.push(cur.trim());return out}
 function importCSV(text){
  let lines=String(text||'').replace(/^\ufeff/,'').split(/\r?\n/).filter(x=>x.trim());if(lines.length<2){toast('Arquivo CSV vazio');return}
- let first=lines[0], sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
- let headers=splitCSVLine(first,sep), hn=headers.map(norm);
+ let first=lines[0],sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
+ importRows(lines.map(x=>splitCSVLine(x,sep)));
+}
+function importRows(rows){
+ rows=(rows||[]).filter(r=>Array.isArray(r)&&r.some(v=>String(v??'').trim()));
+ if(rows.length<2){toast('Arquivo sem dados');return}
+ let headers=rows[0].map(v=>String(v??'').trim()),hn=headers.map(norm);
  const aliases={
   waybill:['waybill no','waybill','waybill number','tracking number','tracking no'],
-  scan:['last scan status','ultimo status','último status','last status'],
+  scan:['last scan type','last scan status','ultimo status','último status','last status','ultimo scan','último scan'],
+  scanDate:['last scan date','data do ultimo scan','data último scan'],
   ptype:['last problem type','tipo da ultima ocorrencia','tipo ocorrência','problem type'],
   preason:['last problem reason','motivo da ultima ocorrencia','motivo ocorrência','problem reason'],
   pdate:['last problem date','data da ultima ocorrencia','data ocorrência','problem date'],
-  city:['consignee city','cidade destinatario','cidade'],
-  area:['consignee area','localidade','bairro','area'],
-  address:['consignee address','endereco destinatario','endereço','endereco'],
-  base:['base','ds','station','hub'],
-  driver:['motorista','driver','courier']
+  city:['destination city','consignee city','cidade destino','cidade destinatario','cidade'],
+  cityCode:['destination city code','codigo cidade destino','código cidade destino'],
+  area:['consignee area','destination area','localidade','bairro','area'],
+  address:['consignee address','destination address','endereco destinatario','endereço','endereco'],
+  zip:['zip code','zipcode','cep'],
+  inventory:['inventory type','tipo de inventario','tipo inventario'],
+  arrival:['arrival time','data chegada','hora chegada'],
+  estimated:['estimated delivered time','estimated delivery time','prazo estimado entrega','previsao entrega'],
+  daysLeft:['days left to deliverey','days left to delivery','dias restantes entrega'],
+  base:['base','ds','station name','hub'],
+  driver:['driver name','motorista','driver','courier'],
+  driverId:['driver id','id motorista']
  };
  const idx=k=>{for(let a of aliases[k]){let i=hn.indexOf(norm(a));if(i>=0)return i}return -1};
  let ix={};Object.keys(aliases).forEach(k=>ix[k]=idx(k));
- if(ix.waybill<0||ix.scan<0){alert('Não encontrei as colunas obrigatórias Waybill No e Last Scan Status.\n\nO importador procura: Waybill No, Last Scan Status, Last Problem Type, Last Problem Reason, Last Problem Date, Consignee City, Consignee Area e Consignee Address.');return}
+ if(ix.waybill<0||ix.scan<0){alert('Não encontrei as colunas principais da planilha.\n\nObrigatórias: Waybill No e Last Scan Type (ou Last Scan Status).\n\nEste importador também reconhece Inventory Type, Driver Name, Last Scan Date, Destination city, Zip Code, Arrival Time, Estimated Delivered Time e Days Left To Deliverey.');return}
  let added=0,updated=0;
- for(let line of lines.slice(1)){let v=splitCSVLine(line,sep),g=k=>ix[k]>=0?(v[ix[k]]||''):'';let id=g('waybill').trim();if(!id)continue;
-  let scan=g('scan'), ptype=g('ptype'), preason=g('preason'), pdate=g('pdate'), city=g('city'), area=g('area'), address=g('address'), base=g('base')||state.bases[0]?.nome||'Base 1';
-  let temp={lastScanStatus:scan,ultimo:scan,status:scan}; let isFloor=floorFlag(temp);
-  let mapped=norm(scan).includes('delivered')||norm(scan).includes('entregue')?'Entregue':norm(scan).includes('out for delivery')||norm(scan).includes('em rota')||norm(scan).includes('saiu para entrega')?'Em rota':norm(scan).includes('dispatch')||norm(scan).includes('despach')?'Despachado':isFloor?'Recebido no DS':'Recebido no DS';
-  let obj={waybill:id,referencia:'',cliente:'',destinatario:'',telefone:'',endereco:address,cidade:city,localidade:area||city,base,prazo:parseDateAny(pdate)||todayISO(),status:mapped,volumes:1,entregador:g('driver')||'',ultimo:scan||'Importado',atualizacao:now(),ocorrencia:preason||ptype,lastScanStatus:scan,lastProblemType:ptype,lastProblemReason:preason,lastProblemDate:pdate,piso:isFloor};
+ for(let r of rows.slice(1)){
+  let g=k=>ix[k]>=0?String(r[ix[k]]??'').trim():'';let id=g('waybill');if(!id)continue;
+  let scan=g('scan'),inventory=g('inventory'),driver=g('driver'),scanDate=g('scanDate'),ptype=g('ptype'),preason=g('preason'),pdate=g('pdate'),city=g('city'),area=g('area'),address=g('address'),estimated=g('estimated');
+  let temp={lastScanStatus:scan,ultimo:scan,status:scan,inventoryType:inventory,entregador:driver,lastScanDate:scanDate};let isFloor=floorFlag(temp);
+  let ns=norm(scan),mapped=ns.includes('delivered')||ns.includes('entregue')?'Entregue':ns.includes('out for delivery')||ns.includes('em rota')||ns.includes('saiu para entrega')?'Em rota':ns.includes('dispatch')||ns.includes('despach')?'Despachado':isFloor?'Recebido no DS':'Recebido no DS';
+  let base=g('base')||state.bases[0]?.nome||'Base 1';
+  let obj={waybill:id,referencia:'',cliente:'',destinatario:'',telefone:'',endereco:address,cidade:city,localidade:area||city,base,prazo:parseDateAny(estimated)||parseDateAny(pdate)||todayISO(),status:mapped,volumes:1,entregador:driver,ultimo:scan||'Importado',atualizacao:scanDate||now(),ocorrencia:preason||ptype,lastScanStatus:scan,lastScanDate:scanDate,lastProblemType:ptype,lastProblemReason:preason,lastProblemDate:pdate,inventoryType:inventory,driverId:g('driverId'),arrivalTime:g('arrival'),estimatedDeliveredTime:estimated,daysLeft:g('daysLeft'),destinationCityCode:g('cityCode'),zipCode:g('zip'),piso:isFloor};
   let old=state.orders.find(x=>x.waybill===id);if(old){Object.assign(old,obj);updated++}else{state.orders.push(obj);added++}
  }
  save();alert(`Importação concluída.\n\n${added} Waybill(s) novos\n${updated} atualizado(s)\n${state.orders.filter(floorFlag).length} identificado(s) como FICOU NO PISO`);render('piso')
